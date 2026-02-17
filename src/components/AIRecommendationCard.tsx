@@ -111,7 +111,7 @@ export default function AIRecommendationCard({ recommendation, onAction }: AIRec
 
                     {isExpanded && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                            {uiPackage.insights.map((insight, index) => (
+                            {uiPackage.insights.map((insight: any, index: number) => (
                                 <div
                                     key={index}
                                     className="bg-black/20 rounded-lg p-3 border border-white/5 flex items-center gap-3"
