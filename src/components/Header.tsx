@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { GoldPrice } from '@/types';
 import { mockUser, mockUserProfile } from '@/services/mock-data.service';
@@ -12,6 +12,7 @@ interface HeaderProps {
 
 export default function Header({ goldPrice }: HeaderProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [showProfile, setShowProfile] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -132,10 +133,10 @@ export default function Header({ goldPrice }: HeaderProps) {
                                                 <p className="text-sm text-gray-400 truncate">{mockUserProfile.email}</p>
                                                 <div className="flex items-center gap-1.5 mt-1.5">
                                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${mockUserProfile.kycStatus === 'verified'
-                                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                                            : mockUserProfile.kycStatus === 'pending'
-                                                                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                                                                : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                                                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                                        : mockUserProfile.kycStatus === 'pending'
+                                                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                                            : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
                                                         }`}>
                                                         {mockUserProfile.kycStatus === 'verified' ? '✓ KYC Verified' :
                                                             mockUserProfile.kycStatus === 'pending' ? '⏳ KYC Pending' : '⚠ KYC Required'}
@@ -208,7 +209,13 @@ export default function Header({ goldPrice }: HeaderProps) {
                                         </Link>
                                         <div className="border-t border-white/10 mt-1 pt-1">
                                             <button
-                                                onClick={() => setShowProfile(false)}
+                                                onClick={() => {
+                                                    setShowProfile(false);
+                                                    if (typeof window !== 'undefined') {
+                                                        localStorage.removeItem('haatak_user');
+                                                    }
+                                                    router.push('/');
+                                                }}
                                                 className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 transition-all w-full text-left group"
                                             >
                                                 <span className="text-lg">🚪</span>
