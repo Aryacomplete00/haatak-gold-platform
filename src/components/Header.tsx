@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { GoldPrice } from '@/types';
 import { mockUser, mockUserProfile } from '@/services/mock-data.service';
+import { useUser } from '@/context/UserContext';
 
 interface HeaderProps {
     goldPrice?: GoldPrice;
@@ -13,8 +14,13 @@ interface HeaderProps {
 export default function Header({ goldPrice }: HeaderProps) {
     const pathname = usePathname();
     const router = useRouter();
+    const { user, logout } = useUser();
     const [showProfile, setShowProfile] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Use logged-in user's info, fallback to mock data
+    const displayName = user?.name || mockUserProfile.name;
+    const displayEmail = user?.email || mockUserProfile.email;
 
     const navItems = [
         { name: 'Home', path: '/home' },
@@ -129,8 +135,8 @@ export default function Header({ goldPrice }: HeaderProps) {
                                                 👤
                                             </div>
                                             <div className="min-w-0">
-                                                <h3 className="text-lg font-bold text-white truncate">{mockUserProfile.name}</h3>
-                                                <p className="text-sm text-gray-400 truncate">{mockUserProfile.email}</p>
+                                                <h3 className="text-lg font-bold text-white truncate">{displayName}</h3>
+                                                <p className="text-sm text-gray-400 truncate">{displayEmail}</p>
                                                 <div className="flex items-center gap-1.5 mt-1.5">
                                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${mockUserProfile.kycStatus === 'verified'
                                                         ? 'bg-green-500/20 text-green-400 border border-green-500/30'
@@ -211,9 +217,7 @@ export default function Header({ goldPrice }: HeaderProps) {
                                             <button
                                                 onClick={() => {
                                                     setShowProfile(false);
-                                                    if (typeof window !== 'undefined') {
-                                                        localStorage.removeItem('haatak_user');
-                                                    }
+                                                    logout();
                                                     router.push('/');
                                                 }}
                                                 className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 transition-all w-full text-left group"

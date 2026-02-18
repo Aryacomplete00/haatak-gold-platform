@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@/context/UserContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useUser();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -15,11 +18,8 @@ export default function LoginPage() {
 
     // Simulate API call
     setTimeout(() => {
-      // Store login state
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('haatak_user', JSON.stringify({ email, loggedIn: true }));
-      }
-
+      // Store login state with user's name
+      login(email, name || undefined);
       router.push('/home');
     }, 1000);
   };
@@ -51,6 +51,21 @@ export default function LoginPage() {
           <h2 className="text-2xl font-semibold mb-6 text-white">Welcome Back</h2>
 
           <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+                Full Name
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="input-gold"
+                placeholder="John Doe"
+                required
+              />
+            </div>
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email Address

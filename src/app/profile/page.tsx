@@ -6,10 +6,16 @@ import Header from '@/components/Header';
 import { getCurrentGoldPrice, getUserProfile } from '@/services/mock-data.service';
 import { GoldPrice } from '@/types';
 import { UserProfile } from '@/types/user';
+import { useUser } from '@/context/UserContext';
 
 export default function ProfilePage() {
     const [goldPrice, setGoldPrice] = useState<GoldPrice | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const { user } = useUser();
+
+    // Use logged-in user's info, fallback to mock data
+    const displayName = user?.name || userProfile?.name || 'User';
+    const displayEmail = user?.email || userProfile?.email || '';
 
     useEffect(() => {
         setGoldPrice(getCurrentGoldPrice());
@@ -75,8 +81,8 @@ export default function ProfilePage() {
                         <div className="flex-1">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-white mb-1">{userProfile.name}</h2>
-                                    <p className="text-gray-400">{userProfile.email}</p>
+                                    <h2 className="text-2xl font-bold text-white mb-1">{displayName}</h2>
+                                    <p className="text-gray-400">{displayEmail}</p>
                                 </div>
                                 <button className="btn-outline-gold px-4 py-2 text-sm w-fit">
                                     Edit Profile
