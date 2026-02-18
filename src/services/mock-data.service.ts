@@ -1,4 +1,5 @@
 import { User, GoldPrice, GoldPriceTrend, EconomicData } from '@/types';
+import { UserProfile, PurchaseHistory } from '@/types/user';
 
 /**
  * Mock Data Service
@@ -34,6 +35,89 @@ export const mockUser: User = {
         }
     ]
 };
+
+export const mockUserProfile: UserProfile = {
+    ...mockUser,
+    kycStatus: 'verified', // Change to 'not_started', 'pending', or 'rejected' to test different states
+    kycDetails: {
+        documentType: 'aadhaar',
+        documentNumber: 'XXXX-XXXX-1234',
+        submittedDate: '2025-12-15',
+        verifiedDate: '2025-12-16'
+    },
+    joinedDate: '2025-11-01',
+    lastLoginDate: new Date().toISOString(),
+    profileImage: undefined
+};
+
+export const mockPurchaseHistory: PurchaseHistory[] = [
+    {
+        id: 'txn_001',
+        type: 'buy',
+        goldGrams: 10.5,
+        pricePerGram: 6150,
+        totalAmount: 64575,
+        timestamp: '2025-12-15T10:30:00Z',
+        status: 'completed',
+        paymentMethod: 'UPI',
+        transactionId: 'TXN20251215001'
+    },
+    {
+        id: 'txn_002',
+        type: 'buy',
+        goldGrams: 5.0,
+        pricePerGram: 6200,
+        totalAmount: 31000,
+        timestamp: '2025-12-20T14:45:00Z',
+        status: 'completed',
+        paymentMethod: 'Credit Card',
+        transactionId: 'TXN20251220001'
+    },
+    {
+        id: 'txn_003',
+        type: 'buy',
+        goldGrams: 15.0,
+        pricePerGram: 6100,
+        totalAmount: 91500,
+        timestamp: '2026-01-05T09:15:00Z',
+        status: 'completed',
+        paymentMethod: 'Net Banking',
+        transactionId: 'TXN20260105001'
+    },
+    {
+        id: 'txn_004',
+        type: 'sell',
+        goldGrams: 3.0,
+        pricePerGram: 6250,
+        totalAmount: 18750,
+        timestamp: '2026-01-10T16:20:00Z',
+        status: 'completed',
+        paymentMethod: 'Bank Transfer',
+        transactionId: 'TXN20260110001'
+    },
+    {
+        id: 'txn_005',
+        type: 'buy',
+        goldGrams: 8.0,
+        pricePerGram: 6180,
+        totalAmount: 49440,
+        timestamp: '2026-01-15T11:00:00Z',
+        status: 'completed',
+        paymentMethod: 'UPI',
+        transactionId: 'TXN20260115001'
+    },
+    {
+        id: 'txn_006',
+        type: 'buy',
+        goldGrams: 10.0,
+        pricePerGram: 6220,
+        totalAmount: 62200,
+        timestamp: '2026-02-01T13:30:00Z',
+        status: 'completed',
+        paymentMethod: 'Debit Card',
+        transactionId: 'TXN20260201001'
+    }
+];
 
 export const getCurrentGoldPrice = (): GoldPrice => {
     // Simulated live price with realistic variations
@@ -135,11 +219,24 @@ export const fetchLiveGoldPrice = async (): Promise<GoldPrice> => {
     return getCurrentGoldPrice();
 };
 
+// Get user profile
+export const getUserProfile = (): UserProfile => {
+    return mockUserProfile;
+};
+
+// Get purchase history
+export const getPurchaseHistory = (): PurchaseHistory[] => {
+    return mockPurchaseHistory;
+};
+
 // In production, these would be real API calls to SafeGold or similar services
 export const goldDataService = {
     getCurrentPrice: getCurrentGoldPrice,
     getPriceTrends: getGoldPriceTrends,
     getEconomicData,
     getHistoricalChanges: getHistoricalPriceChanges,
-    fetchLivePrice: fetchLiveGoldPrice
+    fetchLivePrice: fetchLiveGoldPrice,
+    getUserProfile,
+    getPurchaseHistory
 };
+
