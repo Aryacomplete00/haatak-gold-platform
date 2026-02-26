@@ -224,9 +224,30 @@ export const getUserProfile = (): UserProfile => {
     return mockUserProfile;
 };
 
-// Get purchase history
+// Get purchase history — merges localStorage purchases with mock data
 export const getPurchaseHistory = (): PurchaseHistory[] => {
-    return mockPurchaseHistory;
+    if (typeof window === 'undefined') return mockPurchaseHistory;
+    try {
+        const stored = localStorage.getItem('haatak_transactions');
+        const realTxns: PurchaseHistory[] = stored ? JSON.parse(stored) : [];
+        // Real purchases first (newest), then mock history
+        return [...realTxns, ...mockPurchaseHistory];
+    } catch {
+        return mockPurchaseHistory;
+    }
+};
+
+// Save a new transaction to localStorage
+export const saveNewTransaction = (txn: PurchaseHistory): void => {
+    if (typeof window === 'undefined') return;
+    try {
+        const stored = localStorage.getItem('haatak_transactions');
+        const existing: PurchaseHistory[] = stored ? JSON.parse(stored) : [];
+        existing.unshift(txn); // newest first
+        localStorage.setItem('haatak_transactions', JSON.stringify(existing));
+    } catch (e) {
+        console.error('Failed to save transaction', e);
+    }
 };
 
 // In production, these would be real API calls to SafeGold or similar services

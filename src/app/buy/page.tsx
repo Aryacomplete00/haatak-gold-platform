@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { GoldPrice } from '@/types';
 import { goldDataService, mockUser } from '@/services/mock-data.service';
+import { saveNewTransaction } from '@/services/mock-data.service';
 import { analyticsService } from '@/services/analytics.service';
 
 export default function BuyGoldPage() {
@@ -121,13 +122,25 @@ export default function BuyGoldPage() {
 
         // Simulate API call
         setTimeout(() => {
+            // Save the new transaction to localStorage so holdings updates
+            const newTxn = {
+                id: `txn_real_${Date.now()}`,
+                type: 'buy' as const,
+                goldGrams: parseFloat(grams.toFixed(4)),
+                pricePerGram: goldPrice.pricePerGram,
+                totalAmount: Math.round(rupees),
+                timestamp: new Date().toISOString(),
+                status: 'completed' as const,
+                paymentMethod: 'UPI',
+                transactionId: `TXN${Date.now()}`
+            };
+            saveNewTransaction(newTxn);
+
             setIsProcessing(false);
 
-            // Show success message
-            alert(`✅ Success! You've purchased ${grams.toFixed(3)} grams of gold for ₹${rupees.toLocaleString()}`);
-
-            // Redirect to home
-            router.push('/home');
+            // Show success message and go to holdings
+            alert(`✅ Success! You've purchased ${grams.toFixed(3)} grams of gold for ₹${Math.round(rupees).toLocaleString()}`);
+            router.push('/holdings');
         }, 2000);
     };
 
@@ -205,8 +218,8 @@ export default function BuyGoldPage() {
                         <button
                             onClick={() => setInputMode('rupees')}
                             className={`flex-1 py-3 rounded-lg font-semibold transition-all ${inputMode === 'rupees'
-                                    ? 'bg-amber-500 text-white'
-                                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
                                 }`}
                         >
                             Amount (₹)
@@ -214,8 +227,8 @@ export default function BuyGoldPage() {
                         <button
                             onClick={() => setInputMode('grams')}
                             className={`flex-1 py-3 rounded-lg font-semibold transition-all ${inputMode === 'grams'
-                                    ? 'bg-amber-500 text-white'
-                                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
                                 }`}
                         >
                             Grams (g)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
-import { getCurrentGoldPrice, getPurchaseHistory, mockUser } from '@/services/mock-data.service';
+import { getCurrentGoldPrice, getPurchaseHistory } from '@/services/mock-data.service';
 import { GoldPrice } from '@/types';
 import { PurchaseHistory } from '@/types/user';
 
@@ -18,10 +18,28 @@ export default function HoldingsPage() {
         setPurchaseHistory(getPurchaseHistory());
     }, []);
 
-    const currentValue = mockUser.totalGoldHoldings * (goldPrice?.pricePerGram || 0);
-    const totalProfit = currentValue - mockUser.totalInvestment;
-    const profitPercent = (totalProfit / mockUser.totalInvestment) * 100;
-    const avgBuyPrice = mockUser.totalInvestment / mockUser.totalGoldHoldings;
+    // Calculate live stats from actual transaction history (includes localStorage purchases)
+    const totalGoldBought = purchaseHistory
+        .filter(t => t.type === 'buy')
+        .reduce((sum, t) => sum + t.goldGrams, 0);
+    const totalGoldSold = purchaseHistory
+        .filter(t => t.type === 'sell')
+        .reduce((sum, t) => sum + t.goldGrams, 0);
+    const totalGoldHoldings = parseFloat((totalGoldBought - totalGoldSold).toFixed(4));
+
+    const totalInvested = purchaseHistory
+        .filter(t => t.type === 'buy')
+        .reduce((sum, t) => sum + t.totalAmount, 0);
+    const totalReceived = purchaseHistory
+        .filter(t => t.type === 'sell')
+        .reduce((sum, t) => sum + t.totalAmount, 0);
+    const netInvestment = totalInvested - totalReceived;
+
+    const currentValue = totalGoldHoldings * (goldPrice?.pricePerGram || 0);
+    const totalProfit = currentValue - netInvestment;
+    const profitPercent = netInvestment > 0 ? (totalProfit / netInvestment) * 100 : 0;
+    const avgBuyPrice = totalGoldBought > 0 ? totalInvested / totalGoldBought : 0;
+
 
     const filteredHistory = purchaseHistory.filter(txn => {
         if (filter === 'all') return true;
@@ -79,7 +97,7 @@ export default function HoldingsPage() {
                             <span className="text-2xl">💎</span>
                             <p className="text-gray-400 text-sm">Total Gold</p>
                         </div>
-                        <p className="text-2xl font-bold text-amber-400">{mockUser.totalGoldHoldings}g</p>
+                        <p className="text-2xl font-bold text-amber-400">{totalGoldHoldings.toFixed(3)}g</p>
                         <p className="text-gray-500 text-xs mt-1">
                             Worth ₹{Math.round(currentValue).toLocaleString()}
                         </p>
@@ -90,7 +108,7 @@ export default function HoldingsPage() {
                             <span className="text-2xl">💰</span>
                             <p className="text-gray-400 text-sm">Invested</p>
                         </div>
-                        <p className="text-2xl font-bold text-white">₹{mockUser.totalInvestment.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-white">₹{netInvestment.toLocaleString()}</p>
                         <p className="text-gray-500 text-xs mt-1">
                             {purchaseHistory.filter(t => t.type === 'buy').length} purchases
                         </p>
@@ -201,15 +219,15 @@ export default function HoldingsPage() {
                                             {/* Left: Date & Type Badge */}
                                             <div className="flex items-center gap-4 md:w-1/4">
                                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${txn.type === 'buy'
-                                                        ? 'bg-green-500/15 border border-green-500/30'
-                                                        : 'bg-red-500/15 border border-red-500/30'
+                                                    ? 'bg-green-500/15 border border-green-500/30'
+                                                    : 'bg-red-500/15 border border-red-500/30'
                                                     }`}>
                                                     <span className="text-2xl">{txn.type === 'buy' ? '🛒' : '💸'}</span>
                                                 </div>
                                                 <div>
                                                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${txn.type === 'buy'
-                                                            ? 'bg-green-500/20 text-green-400'
-                                                            : 'bg-red-500/20 text-red-400'
+                                                        ? 'bg-green-500/20 text-green-400'
+                                                        : 'bg-red-500/20 text-red-400'
                                                         }`}>
                                                         {txn.type === 'buy' ? '↑ BOUGHT' : '↓ SOLD'}
                                                     </span>
@@ -248,10 +266,10 @@ export default function HoldingsPage() {
                                                 )}
                                                 <div className="text-right">
                                                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${txn.status === 'completed'
-                                                            ? 'bg-green-500/20 text-green-400'
-                                                            : txn.status === 'pending'
-                                                                ? 'bg-yellow-500/20 text-yellow-400'
-                                                                : 'bg-red-500/20 text-red-400'
+                                                        ? 'bg-green-500/20 text-green-400'
+                                                        : txn.status === 'pending'
+                                                            ? 'bg-yellow-500/20 text-yellow-400'
+                                                            : 'bg-red-500/20 text-red-400'
                                                         }`}>
                                                         {txn.status === 'completed' && '✓'}
                                                         {txn.status === 'pending' && '⏳'}
