@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { GoldPrice } from '@/types';
-import { mockUser, mockUserProfile } from '@/services/mock-data.service';
+import { mockUserProfile } from '@/services/mock-data.service';
 import { useUser } from '@/context/UserContext';
+import { useHoldings } from '@/hooks/useHoldings';
 
 interface HeaderProps {
     goldPrice?: GoldPrice;
@@ -17,6 +18,9 @@ export default function Header({ goldPrice }: HeaderProps) {
     const { user, logout } = useUser();
     const [showProfile, setShowProfile] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Live holdings — re-reads from localStorage whenever a purchase happens
+    const holdings = useHoldings(goldPrice?.pricePerGram || 6250);
 
     // Use logged-in user's info, fallback to mock data
     const displayName = user?.name || mockUserProfile.name;
@@ -44,9 +48,8 @@ export default function Header({ goldPrice }: HeaderProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const currentValue = mockUser.totalGoldHoldings * (goldPrice?.pricePerGram || 6250);
-    const totalProfit = currentValue - mockUser.totalInvestment;
-    const profitPercent = (totalProfit / mockUser.totalInvestment) * 100;
+    // Destructure live values from the hook
+    const { totalGoldHoldings, currentValue, totalInvested, totalProfit, profitPercent } = holdings;
 
     return (
         <header className="sticky top-0 z-50 glass border-b border-amber-500/10">
@@ -158,7 +161,7 @@ export default function Header({ goldPrice }: HeaderProps) {
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="bg-white/5 rounded-lg p-3">
                                                 <p className="text-xs text-gray-400">Total Gold</p>
-                                                <p className="text-lg font-bold text-amber-400">{mockUser.totalGoldHoldings}g</p>
+                                                <p className="text-lg font-bold text-amber-400">{totalGoldHoldings.toFixed(3)}g</p>
                                             </div>
                                             <div className="bg-white/5 rounded-lg p-3">
                                                 <p className="text-xs text-gray-400">Current Value</p>
@@ -166,7 +169,7 @@ export default function Header({ goldPrice }: HeaderProps) {
                                             </div>
                                             <div className="bg-white/5 rounded-lg p-3">
                                                 <p className="text-xs text-gray-400">Invested</p>
-                                                <p className="text-sm font-semibold text-gray-300">₹{mockUser.totalInvestment.toLocaleString()}</p>
+                                                <p className="text-sm font-semibold text-gray-300">₹{Math.round(totalInvested).toLocaleString()}</p>
                                             </div>
                                             <div className="bg-white/5 rounded-lg p-3">
                                                 <p className="text-xs text-gray-400">Returns</p>

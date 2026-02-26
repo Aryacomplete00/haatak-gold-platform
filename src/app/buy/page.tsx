@@ -16,6 +16,7 @@ export default function BuyGoldPage() {
     const [grams, setGrams] = useState<number>(0);
     const [rupees, setRupees] = useState<number>(5000);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [purchaseSuccess, setPurchaseSuccess] = useState<{ grams: number; rupees: number } | null>(null);
 
     useEffect(() => {
         // Check if user is logged in
@@ -134,13 +135,10 @@ export default function BuyGoldPage() {
                 paymentMethod: 'UPI',
                 transactionId: `TXN${Date.now()}`
             };
-            saveNewTransaction(newTxn);
+            saveNewTransaction(newTxn); // also fires 'haatak_holdings_updated'
 
             setIsProcessing(false);
-
-            // Show success message and go to holdings
-            alert(`✅ Success! You've purchased ${grams.toFixed(3)} grams of gold for ₹${Math.round(rupees).toLocaleString()}`);
-            router.push('/holdings');
+            setPurchaseSuccess({ grams, rupees: Math.round(rupees) });
         }, 2000);
     };
 
@@ -158,6 +156,74 @@ export default function BuyGoldPage() {
     return (
         <div className="min-h-screen">
             <Header goldPrice={goldPrice} />
+
+            {/* ── Purchase Success Overlay ─────────────────────────────── */}
+            {purchaseSuccess && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
+                >
+                    <div
+                        className="relative max-w-md w-full rounded-2xl overflow-hidden text-center"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(20,20,30,0.99) 0%, rgba(10,10,20,0.99) 100%)',
+                            border: '1px solid rgba(251,191,36,0.3)',
+                            boxShadow: '0 0 80px rgba(251,191,36,0.15)',
+                            animation: 'fadeInUp 0.4s ease-out'
+                        }}
+                    >
+                        {/* Gold shimmer top bar */}
+                        <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #f59e0b, #fcd34d, #f59e0b)' }} />
+
+                        <div className="p-8">
+                            {/* Big tick */}
+                            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center shadow-2xl shadow-amber-500/40 animate-pulse">
+                                <span className="text-4xl">✓</span>
+                            </div>
+
+                            <h2 className="text-3xl font-bold gold-gradient-text mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+                                Purchase Successful!
+                            </h2>
+                            <p className="text-gray-400 mb-8">Your gold has been credited to your account</p>
+
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                                    <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Gold Credited</p>
+                                    <p className="text-2xl font-bold text-amber-400">{purchaseSuccess.grams.toFixed(4)}g</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">99.9% pure</p>
+                                </div>
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                    <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Amount Paid</p>
+                                    <p className="text-2xl font-bold text-white">₹{purchaseSuccess.rupees.toLocaleString()}</p>
+                                    <p className="text-xs text-green-400 mt-0.5">✓ Verified & Secured</p>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => router.push('/holdings')}
+                                    className="btn-gold w-full py-3 text-base"
+                                >
+                                    View My Holdings →
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setPurchaseSuccess(null);
+                                        setInputValue('5000');
+                                        setRupees(5000);
+                                        setGrams(5000 / goldPrice.pricePerGram);
+                                    }}
+                                    className="btn-outline-gold w-full py-3 text-base"
+                                >
+                                    Buy More Gold
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 {/* Page Header */}

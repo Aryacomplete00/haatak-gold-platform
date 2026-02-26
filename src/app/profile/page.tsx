@@ -7,11 +7,13 @@ import { getCurrentGoldPrice, getUserProfile } from '@/services/mock-data.servic
 import { GoldPrice } from '@/types';
 import { UserProfile } from '@/types/user';
 import { useUser } from '@/context/UserContext';
+import { useHoldings } from '@/hooks/useHoldings';
 
 export default function ProfilePage() {
     const [goldPrice, setGoldPrice] = useState<GoldPrice | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const { user } = useUser();
+    const holdings = useHoldings(goldPrice?.pricePerGram || 6250);
 
     // Use logged-in user's info, fallback to mock data
     const displayName = user?.name || userProfile?.name || 'User';
@@ -203,15 +205,26 @@ export default function ProfilePage() {
                         <div className="space-y-3">
                             <div className="flex justify-between">
                                 <span className="text-gray-400">Total Gold:</span>
-                                <span className="text-amber-400 font-semibold">{userProfile.totalGoldHoldings}g</span>
+                                <span className="text-amber-400 font-bold">{holdings.totalGoldHoldings.toFixed(3)}g</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-400">Total Investment:</span>
-                                <span className="text-white font-semibold">₹{userProfile.totalInvestment.toLocaleString()}</span>
+                                <span className="text-gray-400">Current Value:</span>
+                                <span className="text-white font-semibold">₹{Math.round(holdings.currentValue).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-400">Average Purchase:</span>
-                                <span className="text-gray-300">Every {userProfile.averagePurchaseFrequency} days</span>
+                                <span className="text-gray-400">Net Invested:</span>
+                                <span className="text-white font-semibold">₹{Math.round(holdings.totalInvested).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Returns:</span>
+                                <span className={`font-semibold ${holdings.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {holdings.totalProfit >= 0 ? '+' : ''}₹{Math.round(holdings.totalProfit).toLocaleString()}
+                                    <span className="text-xs ml-1 opacity-75">({holdings.profitPercent >= 0 ? '+' : ''}{holdings.profitPercent.toFixed(2)}%)</span>
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Transactions:</span>
+                                <span className="text-gray-300">{holdings.transactions.length} total</span>
                             </div>
                         </div>
                         <Link href="/holdings" className="btn-outline-gold w-full py-2 text-sm mt-4 inline-block text-center">

@@ -237,7 +237,7 @@ export const getPurchaseHistory = (): PurchaseHistory[] => {
     }
 };
 
-// Save a new transaction to localStorage
+// Save a new transaction to localStorage and notify all listeners
 export const saveNewTransaction = (txn: PurchaseHistory): void => {
     if (typeof window === 'undefined') return;
     try {
@@ -245,10 +245,14 @@ export const saveNewTransaction = (txn: PurchaseHistory): void => {
         const existing: PurchaseHistory[] = stored ? JSON.parse(stored) : [];
         existing.unshift(txn); // newest first
         localStorage.setItem('haatak_transactions', JSON.stringify(existing));
+
+        // Notify Header / useHoldings hook immediately (same tab)
+        window.dispatchEvent(new Event('haatak_holdings_updated'));
     } catch (e) {
         console.error('Failed to save transaction', e);
     }
 };
+
 
 // In production, these would be real API calls to SafeGold or similar services
 export const goldDataService = {
