@@ -8,30 +8,33 @@ import { goldDataService, mockUser } from '@/services/mock-data.service';
 import { saveNewTransaction } from '@/services/mock-data.service';
 import { analyticsService } from '@/services/analytics.service';
 
+// ── Suggestion tier config ────────────────────────────────────────────────────
+function getSuggestionTier(amount: number): { pct: number; label: string } | null {
+    if (amount < 10) return null;
+    if (amount <= 500) return { pct: 75, label: 'great starter' };
+    if (amount <= 2000) return { pct: 40, label: 'better growth' };
+    if (amount <= 6000) return { pct: 30, label: 'solid portfolio' };
+    if (amount <= 15000) return { pct: 20, label: 'wealth building' };
+    return { pct: 15, label: 'premium investor' };
+}
+
 export default function BuyGoldPage() {
     const router = useRouter();
     const [goldPrice, setGoldPrice] = useState<GoldPrice | null>(null);
     const [inputMode, setInputMode] = useState<'grams' | 'rupees'>('rupees');
-    const [inputValue, setInputValue] = useState<string>('5000');
+    const [inputValue, setInputValue] = useState<string>('');
     const [grams, setGrams] = useState<number>(0);
-    const [rupees, setRupees] = useState<number>(5000);
+    const [rupees, setRupees] = useState<number>(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [purchaseSuccess, setPurchaseSuccess] = useState<{ grams: number; rupees: number } | null>(null);
 
     useEffect(() => {
-        // Check if user is logged in
         if (typeof window !== 'undefined') {
             const user = localStorage.getItem('haatak_user');
-            if (!user) {
-                router.push('/');
-                return;
-            }
+            if (!user) { router.push('/'); return; }
         }
-
         loadGoldPrice();
         analyticsService.trackPageView(mockUser.id, '/buy');
-
-        // Auto-refresh price every 30 seconds
         const interval = setInterval(loadGoldPrice, 30000);
         return () => clearInterval(interval);
     }, [router]);
@@ -39,31 +42,14 @@ export default function BuyGoldPage() {
     const loadGoldPrice = async () => {
         const price = await goldDataService.fetchLivePrice();
         setGoldPrice(price);
-
-        // Recalculate based on current input
-        if (inputMode === 'rupees' && inputValue) {
-            const amount = parseFloat(inputValue);
-            if (!isNaN(amount) && price) {
-                setGrams(amount / price.pricePerGram);
-            }
-        } else if (inputMode === 'grams' && inputValue) {
-            const gramAmount = parseFloat(inputValue);
-            if (!isNaN(gramAmount) && price) {
-                setRupees(gramAmount * price.pricePerGram);
-            }
-        }
     };
 
     const handleInputChange = (value: string) => {
         setInputValue(value);
         const numValue = parseFloat(value);
-
-        if (isNaN(numValue) || !goldPrice) {
-            setGrams(0);
-            setRupees(0);
-            return;
+        if (isNaN(numValue) || !goldPrice || numValue <= 0) {
+            setGrams(0); setRupees(0); return;
         }
-
         if (inputMode === 'rupees') {
             setRupees(numValue);
             setGrams(numValue / goldPrice.pricePerGram);
@@ -73,57 +59,11 @@ export default function BuyGoldPage() {
         }
     };
 
-    const handleQuickAmount = (amount: number) => {
-        setInputMode('rupees');
-        setInputValue(amount.toString());
-        handleInputChange(amount.toString());
-    };
-
-    // Smart suggestion system
-    const getSmartSuggestion = () => {
-        if (rupees < 10) return null;
-
-        if (rupees < 50) return 50;
-        if (rupees < 100) return 100;
-        if (rupees < 500) return 500;
-        if (rupees < 1000) return 1000;
-        if (rupees < 5000) return 5000;
-        if (rupees < 10000) return 10000;
-        if (rupees < 25000) return 25000;
-        if (rupees < 50000) return 50000;
-
-        // For amounts >= 50000, suggest double
-        return Math.round(rupees * 2);
-    };
-
-    // Calculate 6-month profit projection
-    const calculate6MonthProfit = () => {
-        if (rupees < 10) return null;
-
-        // Historical gold returns: ~9.9% annually = ~4.95% for 6 months
-        const sixMonthReturnRate = 0.0495; // 4.95%
-        const estimatedValue = rupees * (1 + sixMonthReturnRate);
-        const estimatedProfit = estimatedValue - rupees;
-
-        return {
-            currentInvestment: rupees,
-            estimatedValue: Math.round(estimatedValue),
-            estimatedProfit: Math.round(estimatedProfit),
-            returnPercent: (sixMonthReturnRate * 100).toFixed(2)
-        };
-    };
-
     const handleBuyGold = async () => {
         if (!goldPrice || rupees < 10) return;
-
         setIsProcessing(true);
-
-        // Track the transaction
         analyticsService.trackTransaction(mockUser.id, 'buy', rupees, grams);
-
-        // Simulate API call
         setTimeout(() => {
-            // Save the new transaction to localStorage so holdings updates
             const newTxn = {
                 id: `txn_real_${Date.now()}`,
                 type: 'buy' as const,
@@ -135,58 +75,54 @@ export default function BuyGoldPage() {
                 paymentMethod: 'UPI',
                 transactionId: `TXN${Date.now()}`
             };
-            saveNewTransaction(newTxn); // also fires 'haatak_holdings_updated'
-
+            saveNewTransaction(newTxn);
             setIsProcessing(false);
             setPurchaseSuccess({ grams, rupees: Math.round(rupees) });
         }, 2000);
     };
 
     if (!goldPrice) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="spinner"></div>
-            </div>
-        );
+        return <div className="min-h-screen flex items-center justify-center"><div className="spinner" /></div>;
     }
 
-    const smartSuggestion = getSmartSuggestion();
-    const profitProjection = calculate6MonthProfit();
+    // ── Derived values ────────────────────────────────────────────────────────
+    const tier = inputMode === 'rupees'
+        ? getSuggestionTier(rupees)
+        : (grams > 0 ? getSuggestionTier(grams * goldPrice.pricePerGram) : null);
+
+    const suggestRupees = tier ? Math.round(rupees * (1 + tier.pct / 100)) : 0;
+    const suggestGrams = tier ? parseFloat((grams * (1 + tier.pct / 100)).toFixed(4)) : 0;
+    const extraRupees = suggestRupees - Math.round(rupees);
+    const extraGrams = parseFloat((suggestGrams - grams).toFixed(4));
+
+    // Returns for current amount
+    const r6m = rupees > 0 ? Math.round(rupees * 0.0495) : 0;
+    const r1y = rupees > 0 ? Math.round(rupees * 0.099) : 0;
 
     return (
         <div className="min-h-screen">
             <Header goldPrice={goldPrice} />
 
-            {/* ── Purchase Success Overlay ─────────────────────────────── */}
+            {/* ── Purchase Success Overlay ─────────────────────────── */}
             {purchaseSuccess && (
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
-                >
-                    <div
-                        className="relative max-w-md w-full rounded-2xl overflow-hidden text-center"
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
+                    <div className="relative max-w-md w-full rounded-2xl overflow-hidden text-center"
                         style={{
-                            background: 'linear-gradient(135deg, rgba(20,20,30,0.99) 0%, rgba(10,10,20,0.99) 100%)',
+                            background: 'linear-gradient(135deg,rgba(20,20,30,.99),rgba(10,10,20,.99))',
                             border: '1px solid rgba(251,191,36,0.3)',
                             boxShadow: '0 0 80px rgba(251,191,36,0.15)',
                             animation: 'fadeInUp 0.4s ease-out'
-                        }}
-                    >
-                        {/* Gold shimmer top bar */}
-                        <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #f59e0b, #fcd34d, #f59e0b)' }} />
-
+                        }}>
+                        <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg,#f59e0b,#fcd34d,#f59e0b)' }} />
                         <div className="p-8">
-                            {/* Big tick */}
                             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center shadow-2xl shadow-amber-500/40 animate-pulse">
                                 <span className="text-4xl">✓</span>
                             </div>
-
-                            <h2 className="text-3xl font-bold gold-gradient-text mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+                            <h2 className="text-3xl font-bold gold-gradient-text mb-2" style={{ fontFamily: 'Playfair Display,serif' }}>
                                 Purchase Successful!
                             </h2>
                             <p className="text-gray-400 mb-8">Your gold has been credited to your account</p>
-
-                            {/* Stats */}
                             <div className="grid grid-cols-2 gap-4 mb-8">
                                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                                     <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Gold Credited</p>
@@ -199,24 +135,12 @@ export default function BuyGoldPage() {
                                     <p className="text-xs text-green-400 mt-0.5">✓ Verified & Secured</p>
                                 </div>
                             </div>
-
-                            {/* Actions */}
                             <div className="flex flex-col gap-3">
-                                <button
-                                    onClick={() => router.push('/holdings')}
-                                    className="btn-gold w-full py-3 text-base"
-                                >
+                                <button onClick={() => router.push('/holdings')} className="btn-gold w-full py-3 text-base">
                                     View My Holdings →
                                 </button>
-                                <button
-                                    onClick={() => {
-                                        setPurchaseSuccess(null);
-                                        setInputValue('5000');
-                                        setRupees(5000);
-                                        setGrams(5000 / goldPrice.pricePerGram);
-                                    }}
-                                    className="btn-outline-gold w-full py-3 text-base"
-                                >
+                                <button onClick={() => { setPurchaseSuccess(null); setInputValue(''); setGrams(0); setRupees(0); }}
+                                    className="btn-outline-gold w-full py-3 text-base">
                                     Buy More Gold
                                 </button>
                             </div>
@@ -228,12 +152,10 @@ export default function BuyGoldPage() {
             <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 {/* Page Header */}
                 <div className="text-center mb-8 animate-fade-in-up">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-3 gold-gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>
+                    <h1 className="text-4xl md:text-5xl font-bold mb-3 gold-gradient-text" style={{ fontFamily: 'Playfair Display,serif' }}>
                         Buy Digital Gold
                     </h1>
-                    <p className="text-gray-300 text-lg">
-                        Invest in 99.9% pure digital gold starting from just ₹10
-                    </p>
+                    <p className="text-gray-300 text-lg">Invest in 99.9% pure digital gold starting from just ₹10</p>
                 </div>
 
                 {/* Live Price Banner */}
@@ -254,54 +176,23 @@ export default function BuyGoldPage() {
                     </div>
                 </div>
 
-                {/* Quick Amount Selection */}
-                <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                    <p className="text-white font-semibold mb-3">Quick Select Amount</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[1000, 5000, 10000, 25000].map((amount) => (
-                            <button
-                                key={amount}
-                                onClick={() => handleQuickAmount(amount)}
-                                className={`premium-card p-4 text-center transition-all hover:border-amber-500 ${rupees === amount ? 'border-amber-500 bg-amber-500/10' : ''
-                                    }`}
-                            >
-                                <p className="text-gray-400 text-xs mb-1">Invest</p>
-                                <p className="text-white font-bold">₹{amount.toLocaleString()}</p>
-                                <p className="text-amber-400 text-xs mt-1">
-                                    ~{(amount / goldPrice.pricePerGram).toFixed(2)}g
-                                </p>
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* Main Input Card */}
+                <div className="premium-card p-8 mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+                    <h2 className="text-2xl font-bold text-white mb-6">Enter Amount</h2>
 
-                {/* Custom Amount Input */}
-                <div className="premium-card p-8 mb-8 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-                    <h2 className="text-2xl font-bold text-white mb-6">Enter Custom Amount</h2>
-
-                    {/* Toggle Input Mode */}
+                    {/* Toggle */}
                     <div className="flex gap-3 mb-6">
-                        <button
-                            onClick={() => setInputMode('rupees')}
-                            className={`flex-1 py-3 rounded-lg font-semibold transition-all ${inputMode === 'rupees'
-                                ? 'bg-amber-500 text-white'
-                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                }`}
-                        >
+                        <button onClick={() => { setInputMode('rupees'); setInputValue(''); setGrams(0); setRupees(0); }}
+                            className={`flex-1 py-3 rounded-lg font-semibold transition-all ${inputMode === 'rupees' ? 'bg-amber-500 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
                             Amount (₹)
                         </button>
-                        <button
-                            onClick={() => setInputMode('grams')}
-                            className={`flex-1 py-3 rounded-lg font-semibold transition-all ${inputMode === 'grams'
-                                ? 'bg-amber-500 text-white'
-                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                }`}
-                        >
+                        <button onClick={() => { setInputMode('grams'); setInputValue(''); setGrams(0); setRupees(0); }}
+                            className={`flex-1 py-3 rounded-lg font-semibold transition-all ${inputMode === 'grams' ? 'bg-amber-500 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
                             Grams (g)
                         </button>
                     </div>
 
-                    {/* Input Field */}
+                    {/* Input */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                             {inputMode === 'rupees' ? 'Enter Amount in Rupees' : 'Enter Weight in Grams'}
@@ -315,95 +206,120 @@ export default function BuyGoldPage() {
                                 value={inputValue}
                                 onChange={(e) => handleInputChange(e.target.value)}
                                 className="input-gold pl-12 text-xl"
-                                placeholder={inputMode === 'rupees' ? '10' : '0.001'}
+                                placeholder={inputMode === 'rupees' ? 'e.g. 500' : 'e.g. 0.1'}
                                 min="0"
                                 step={inputMode === 'rupees' ? '10' : '0.001'}
                             />
                         </div>
                     </div>
 
-                    {/* Smart Suggestion */}
-                    {smartSuggestion && rupees >= 10 && (
-                        <div className="mb-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <span className="text-2xl">💡</span>
-                                <div className="flex-1">
-                                    <h4 className="text-blue-300 font-semibold mb-1">Smart Investment Tip</h4>
-                                    <p className="text-blue-100 text-sm mb-3">
-                                        Investing more helps you reach your wealth goals faster! Consider increasing your investment to:
-                                    </p>
+                    {/* ── MyJio-style Suggestion Banner ──────────────────────── */}
+                    {tier && (inputMode === 'rupees' ? rupees >= 10 : grams > 0) && (
+                        <div className="mb-6 rounded-2xl overflow-hidden"
+                            style={{ border: '1px solid rgba(251,191,36,0.25)' }}>
+
+                            {/* Tier badge */}
+                            <div className="px-4 py-2 flex items-center gap-2"
+                                style={{ background: 'linear-gradient(90deg,rgba(251,191,36,0.18),rgba(251,191,36,0.06))' }}>
+                                <span className="text-amber-400 font-bold text-xs uppercase tracking-widest">
+                                    💡 Recommended Upgrade · {tier.pct}% More for {tier.label}
+                                </span>
+                            </div>
+
+                            {/* Comparison rows */}
+                            <div className="p-4 space-y-3" style={{ background: 'rgba(0,0,0,0.35)' }}>
+
+                                {/* Current plan row */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" />
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-gray-300 text-sm">Your current amount</span>
+                                            <span className="text-white font-semibold text-sm">
+                                                {inputMode === 'rupees'
+                                                    ? `₹${Math.round(rupees).toLocaleString()}`
+                                                    : `${grams.toFixed(4)}g`}
+                                            </span>
+                                        </div>
+                                        {/* Progress bar – baseline */}
+                                        <div className="h-2 rounded-full bg-gray-700 relative overflow-hidden">
+                                            <div className="absolute inset-y-0 left-0 bg-gray-500 rounded-full" style={{ width: '65%' }} />
+                                        </div>
+                                        <p className="text-gray-500 text-xs mt-1">
+                                            {inputMode === 'rupees'
+                                                ? `≈ ${grams.toFixed(4)} grams of gold`
+                                                : `≈ ₹${Math.round(rupees).toLocaleString()}`}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Suggested plan row */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-amber-300 text-sm font-semibold">
+                                                Suggested ({tier.pct}% more)
+                                            </span>
+                                            <span className="text-amber-400 font-bold text-sm">
+                                                {inputMode === 'rupees'
+                                                    ? `₹${suggestRupees.toLocaleString()}`
+                                                    : `${suggestGrams.toFixed(4)}g`}
+                                            </span>
+                                        </div>
+                                        {/* Full progress bar – suggested */}
+                                        <div className="h-2 rounded-full bg-amber-500/20 relative overflow-hidden">
+                                            <div className="absolute inset-y-0 left-0 rounded-full animate-pulse"
+                                                style={{ width: '100%', background: 'linear-gradient(90deg,#f59e0b,#fcd34d)' }} />
+                                        </div>
+                                        <p className="text-amber-400/80 text-xs mt-1">
+                                            {inputMode === 'rupees'
+                                                ? `≈ ${suggestGrams.toFixed(4)} grams  (+${extraGrams.toFixed(4)}g more gold)`
+                                                : `≈ ₹${suggestRupees.toLocaleString()}  (+₹${extraRupees.toLocaleString()} more)`}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Difference pill */}
+                                <div className="flex items-center justify-between mt-1 pt-3 border-t border-white/10">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-green-400 text-sm">✨ Difference</span>
+                                        <span className="bg-green-500/15 text-green-300 text-xs font-bold px-2 py-0.5 rounded-full border border-green-500/30">
+                                            +{tier.pct}%
+                                        </span>
+                                    </div>
                                     <button
-                                        onClick={() => handleQuickAmount(smartSuggestion)}
-                                        className="btn-outline-gold text-sm px-4 py-2"
+                                        onClick={() => {
+                                            if (inputMode === 'rupees') {
+                                                setInputValue(suggestRupees.toString());
+                                                handleInputChange(suggestRupees.toString());
+                                            } else {
+                                                setInputValue(suggestGrams.toString());
+                                                handleInputChange(suggestGrams.toString());
+                                            }
+                                        }}
+                                        className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                                        style={{ background: 'linear-gradient(90deg,#f59e0b,#fcd34d)', color: '#000' }}
                                     >
-                                        Invest ₹{smartSuggestion.toLocaleString()} instead →
+                                        Upgrade →
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 6-Month Profit Projection */}
-                    {profitProjection && (
-                        <div className="mb-6 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-lg p-6">
-                            <div className="flex items-start gap-3 mb-4">
-                                <span className="text-3xl">📈</span>
-                                <div className="flex-1">
-                                    <h4 className="text-green-300 font-semibold text-lg mb-1">
-                                        6-Month Profit Projection (Hold Strategy)
-                                    </h4>
-                                    <p className="text-green-100 text-sm">
-                                        Based on historical gold performance of ~{profitProjection.returnPercent}% over 6 months
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="bg-black/20 rounded-lg p-4 text-center">
-                                    <p className="text-gray-400 text-xs mb-1">Today's Investment</p>
-                                    <p className="text-white font-bold text-lg">
-                                        ₹{profitProjection.currentInvestment.toLocaleString()}
-                                    </p>
-                                </div>
-                                <div className="bg-black/20 rounded-lg p-4 text-center">
-                                    <p className="text-gray-400 text-xs mb-1">Value After 6 Months</p>
-                                    <p className="text-green-400 font-bold text-lg">
-                                        ₹{profitProjection.estimatedValue.toLocaleString()}
-                                    </p>
-                                </div>
-                                <div className="bg-black/20 rounded-lg p-4 text-center">
-                                    <p className="text-gray-400 text-xs mb-1">Estimated Profit</p>
-                                    <p className="text-emerald-400 font-bold text-lg">
-                                        +₹{profitProjection.estimatedProfit.toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                                <p className="text-amber-200 text-xs flex items-start gap-2">
-                                    <span className="text-base">💎</span>
-                                    <span>
-                                        <strong>Hold for better returns!</strong> Historical data shows gold investors who hold for longer periods
-                                        typically earn higher returns. This projection is based on past performance and actual returns may vary.
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Calculation Summary */}
-                    <div className="bg-black/20 rounded-lg p-6 border border-amber-500/20">
+                    <div className="bg-black/20 rounded-lg p-6 border border-amber-500/20 mb-6">
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
                                 <p className="text-gray-400 text-sm mb-1">You'll Get</p>
-                                <p className="text-2xl font-bold text-amber-400">{grams.toFixed(3)} grams</p>
+                                <p className="text-2xl font-bold text-amber-400">{grams.toFixed(4)} grams</p>
                             </div>
                             <div className="text-right">
                                 <p className="text-gray-400 text-sm mb-1">You'll Pay</p>
                                 <p className="text-2xl font-bold text-white">₹{Math.round(rupees).toLocaleString()}</p>
                             </div>
                         </div>
-
                         <div className="border-t border-white/10 pt-4">
                             <div className="flex justify-between text-sm mb-2">
                                 <span className="text-gray-400">Rate per gram</span>
@@ -419,10 +335,28 @@ export default function BuyGoldPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* 6-Month / 1-Year return preview (only when amount entered) */}
+                    {rupees >= 10 && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="rounded-xl p-4 border border-blue-500/20"
+                                style={{ background: 'rgba(59,130,246,0.07)' }}>
+                                <p className="text-blue-300 text-xs font-semibold uppercase tracking-wider mb-1">📅 6-Month Est. Return</p>
+                                <p className="text-blue-200 font-bold text-lg">+₹{r6m.toLocaleString()}</p>
+                                <p className="text-blue-400/70 text-xs mt-0.5">~4.95% historical growth</p>
+                            </div>
+                            <div className="rounded-xl p-4 border border-green-500/20"
+                                style={{ background: 'rgba(34,197,94,0.07)' }}>
+                                <p className="text-green-300 text-xs font-semibold uppercase tracking-wider mb-1">🎯 1-Year Est. Return</p>
+                                <p className="text-green-200 font-bold text-lg">+₹{r1y.toLocaleString()}</p>
+                                <p className="text-green-400/70 text-xs mt-0.5">~9.9% historical growth</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Payment Methods */}
-                <div className="premium-card p-6 mb-8 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+                <div className="premium-card p-6 mb-8 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
                     <h3 className="text-lg font-semibold text-white mb-4">Payment Methods</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {['UPI', 'Net Banking', 'Debit Card', 'Wallet'].map((method) => (
@@ -434,7 +368,7 @@ export default function BuyGoldPage() {
                 </div>
 
                 {/* Buy Button */}
-                <div className="animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+                <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
                     <button
                         onClick={handleBuyGold}
                         disabled={isProcessing || rupees < 10}
@@ -442,20 +376,16 @@ export default function BuyGoldPage() {
                     >
                         {isProcessing ? (
                             <span className="flex items-center justify-center gap-3">
-                                <div className="spinner w-5 h-5 border-2"></div>
+                                <div className="spinner w-5 h-5 border-2" />
                                 Processing Purchase...
                             </span>
-                        ) : (
-                            `Buy ${grams.toFixed(3)}g Gold for ₹${Math.round(rupees).toLocaleString()}`
-                        )}
+                        ) : rupees >= 10 ? (
+                            `Buy ${grams.toFixed(4)}g Gold for ₹${Math.round(rupees).toLocaleString()}`
+                        ) : 'Enter an amount to continue'}
                     </button>
-
-                    {rupees < 10 && rupees > 0 && (
-                        <p className="text-red-400 text-sm text-center mt-3">
-                            Minimum purchase amount is ₹10
-                        </p>
+                    {rupees > 0 && rupees < 10 && (
+                        <p className="text-red-400 text-sm text-center mt-3">Minimum purchase amount is ₹10</p>
                     )}
-
                     <p className="text-gray-500 text-sm text-center mt-3">
                         🔒 100% secure payment • Instant gold credit • Insured storage
                     </p>
@@ -463,21 +393,15 @@ export default function BuyGoldPage() {
 
                 {/* Benefits */}
                 <div className="grid md:grid-cols-3 gap-4 mt-8">
-                    <div className="text-center">
-                        <div className="text-3xl mb-2">⚡</div>
-                        <p className="text-white font-semibold mb-1">Instant Purchase</p>
-                        <p className="text-gray-400 text-sm">Gold credited immediately</p>
-                    </div>
-                    <div className="text-center">
-                        <div className="text-3xl mb-2">🏆</div>
-                        <p className="text-white font-semibold mb-1">99.9% Pure</p>
-                        <p className="text-gray-400 text-sm">Certified hallmark gold</p>
-                    </div>
-                    <div className="text-center">
-                        <div className="text-3xl mb-2">🔒</div>
-                        <p className="text-white font-semibold mb-1">Secure Vaults</p>
-                        <p className="text-gray-400 text-sm">Fully insured storage</p>
-                    </div>
+                    {[['⚡', 'Instant Purchase', 'Gold credited immediately'],
+                    ['🏆', '99.9% Pure', 'Certified hallmark gold'],
+                    ['🔒', 'Secure Vaults', 'Fully insured storage']].map(([icon, title, desc]) => (
+                        <div key={title} className="text-center">
+                            <div className="text-3xl mb-2">{icon}</div>
+                            <p className="text-white font-semibold mb-1">{title}</p>
+                            <p className="text-gray-400 text-sm">{desc}</p>
+                        </div>
+                    ))}
                 </div>
             </main>
         </div>
